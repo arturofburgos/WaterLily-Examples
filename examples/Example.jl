@@ -7,7 +7,11 @@ function make_sim(;n=2^6, U=1, Re=1000, mem=Array)
     # define the body
     R = n/2
     function sdf(xyz, t)
-        norm(xyz) - R # sphere
+        # norm(xyz) - R # sphere
+        x,y,z = xyz
+        r = norm(SA[y,z]); r-R # cylinder
+        norm(SA[x, r-min(r,R)]) -1.5 #disk - combination with a plane and a cylinder
+
     end
 
     map(xyz, t) = xyz - SA[2n/3,0,0] # place/move the center
@@ -46,14 +50,38 @@ begin
     # Create CPU buffer arrays for geometry flow viz 
     a = sim.flow.σ
     d = similar(a,size(inside(a))) |> Array; # one quadrant
-    md = similar(d,(2,2,1).*size(d))  # hold mirrored data
+    md = similar(d,(2,1,1).*size(d))  # hold mirrored data
 
     # Set up geometry viz
     geom = geom!(md,d,sim) |> Observable;
     fig, _, _ = GLMakie.mesh(geom, alpha=1, color=:lightblue)
 
     
-    volume!(d) #comment if necessary
-    volume!(md) #comment if necessary
+    # volume!(d) #comment if necessary
+    # volume!(md) #comment if necessary
     fig
 end
+
+
+sim_step!(sim,0.2)
+
+dat = flow_λ₂(sim)
+colormap = :viridis |> to_colormap |> reverse
+obs = dat |> Observable
+contour!(obs;colormap, levels=1, alpha=0.7)
+fig
+
+fps = 60
+
+for _ in 1:500
+    sim_step!(sim, sim_time(sim)+0.02, remeasure=false)
+    obs[] = flow_λ₂!(dat, sim)
+    sleep(1/fps)
+end
+
+fig
+
+volume!(obs, algorithm=:mip)
+fig
+
+fig = ()
